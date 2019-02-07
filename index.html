@@ -164,7 +164,45 @@ find . -path './openshift-ansible/playbooks/*' -type d -depth 6 |
 
 ---
 
+# Orchestration and Automation
 
+- running ansible through tower
+- orchestrate tower jobs through jenkins
+
+---
+
+# Tower Configuration 
+
+- define each cluster as an inventory
+- ssh key rotate puts cluster level public key in `authorized_keys`, private key in tower credential
+- "Environment" ties a inventory + credential to configure access to the cluster
+
+---
+
+# Jenkins Setup
+
+- Automating change control with standard changes
+  - see my previous talk here
+- A tower job has a limited number of components, we just build jobs that simplify the selection of these:
+  - extra vars
+  - code location
+  - playbook to run
+  - credential & inventory
+- Create "higher level" jobs that are easy to operate
+
+---
+
+# Patching
+
+- Dont change in flight
+- Scale up, then scale down
+- Except for master nodes :(....working on it
+
+---
+
+# Scaling
+
+- Same as patching, which is great!
 ---
 
 # Takeaways
@@ -175,3 +213,11 @@ find . -path './openshift-ansible/playbooks/*' -type d -depth 6 |
 * Orchestrated the complexity using Jenkins jobs
 * Come work with us: https://healthpartners.com/careers
 
+---
+
+# References
+
+* https://github.com/openshift/openshift-ansible
+* https://github.com/HealthPartners/rhug-sept-2018
+* https://plugins.jenkins.io/ansible-tower
+* https://docs.ansible.com/ansible-tower/latest/html/towerapi/index.html
