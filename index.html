@@ -3,15 +3,15 @@ layout: default
 title: Managing our OpenShift Infrastructure
 ---
 
+name: inverse
 layout: true
-name: top-bar
-.left[![HealthPartners](/rhug-feb-2019/images/hplogo.gif)]
-.twitter-handle[
-  `@jmcshane`
-]
+class: center, middle
+
 ---
 
 class: center
+
+.brand-image-top[![HealthPartnersBig](/rhug-feb-2019/images/hp-1v-4c.png)]
 
 # Managing our OpenShift Infrastructure
 
@@ -19,7 +19,16 @@ class: center
 
 ## How HealthPartners Builds and Manages OpenShift Clusters 
 
+
 ---
+layout: true
+name: top-bar
+.brand-image[![HealthPartners](/rhug-feb-2019/images/hp-1v-4c.png)]
+.twitter-handle[
+  `@jmcshane`
+]
+---
+
 
 # Introduction
 
@@ -37,11 +46,132 @@ class: center
 * Validate all changes before production
 * Prepare for the future
 
+???
+
+* After a couple false starts, we've been able to patch the environment every month 
+* got to 3.11 within a couple days of release
+---
+
+# Getting Started
+
+.center[![OpenshiftAnsible](/rhug-feb-2019/images/openshift-ansible.png)]
+
+???
+
+* RedHat has published much of what it takes to manage an out of the box openshift cluster
+* Given infrastructure exists and has pre-reqs set up
+  * This is where the rubber hits the road
+* Version specific code(!)
+
+---
+
+# Our Infrastructure Choices
+
+* UCS Chassis
+* RHEV for Virtualization
+* VMWare for Virtualization (stay tuned)
+* F5 external load balancer
+* A few network components to be discussed
+* NetApp for Storage
+* Ansible for automation
+
+---
+
+# Jobs to be Done
+
+* Building clusters
+* Patching clusters
+* Scaling clusters
+* Updating openshift software
+* Updating cluster admin level components
+* Day 2 operations - observability, disaster recovery
+
+---
+
+# Code Structure
+
+* Put all of our code in a single repository
+  * Master branch does not contain openshift-ansible
+* Version specific branches that we clone the openshift-ansible version release branch to
+* Most of our code is standalone, except for the turnkey stuff
+
+---
+
+# `openshiftcluster`
+
+![OpenshiftCluster](/rhug-feb-2019/images/openshiftcluster.png)
+![OpenshiftCluster311](/rhug-feb-2019/images/openshiftcluster-3.11.png)
+
+???
+
+* You can see the repository structure in the master branch here
+* vs 3.11 branch which has openshift-ansible code checked out
+
+---
+
+# Referencing `openshift-ansible`
+
+```
+- name: Scale up new nodes
+  import_playbook: openshift-ansible/playbooks/openshift-node/scaleup.yml
+  tags: scaleup
+```
+
+* Hacking `group_vars`
+
+```
+find . -path './openshift-ansible/playbooks/*' -type d -depth 3 | 
+  xargs -L1 ln -s ../../../group_vars $1/group_vars
+
+find . -path './openshift-ansible/playbooks/*' -type d -depth 4 | 
+  xargs -L1 ln -s ../../../../group_vars $1/group_vars
+
+find . -path './openshift-ansible/playbooks/*' -type d -depth 5 | 
+  xargs -L1 ln -s ../../../../../group_vars $1/group_vars
+
+find . -path './openshift-ansible/playbooks/*' -type d -depth 6 |
+  xargs -L1 ln -s ../../../../../../group_vars $1/group_vars
+```
+
+---
+
+# Customizing OpenShift
+
+* An out of the box cluster is useful for experimentation, but not production
+* What things do we add:
+  * LDAP group management
+  * Connect to our Artifactory docker repository
+  * Cleanup scripts
+  * Trident installation
+  * Security scanning
+  * Router customization
+  * Additional `SecurityContextConstraints`
+  * And much more...
+
+???
+
+* Lots of stuff to do in an out of the box cluster
+
+--- 
+
+# Managing our customization
+
+* Define three types of Ansible roles
+  * OC only - interact with OpenShift master API
+  * Infra only - manage packages and files on the VMs
+  * OpenShift software - interact with `openshift-ansible`
+* Defined jobs that can run arbitrary roles of each type by name and target
+
+---
+
+
 ---
 
 # Takeaways
 
-* Supporting testing is critical
-* Open source is great!
+* Separated the concerns of infrastructure automation, infrastructure access, and orchestration
+* Automation through Ansible, extending the RedHat openshift-ansible repository
+* Infrastructure access & centralization through Ansible Tower
+* Orchestrated the complexity using Jenkins jobs
 * Come work with us: https://healthpartners.com/careers
 

@@ -4,28 +4,51 @@
     <meta charset="utf-8">
     <title>{{ page.title | strip_html }}</title>
     <style>
-      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
-      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(/rhug-feb-2019/fonts/lato-bold-woff.woff);
+      @import url(/rhug-feb-2019/fonts/lato-regular-woff.woff);
+      @import url(/rhug-feb-2019/fonts/sanchez-semibold-woff.woff);
       @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
 
-      body { font-family: 'Droid Serif'; }
-      h1, h2, h3 {
-        font-family: 'Yanone Kaffeesatz';
+      body { font-family: 'lato-regular'; }
+      h1, h2, h3, h4, h5, h6 {
+        font-family: "sanchez-semibold", Georgia, "Times New Roman", Times, serif !important;
         font-weight: normal;
         margin-bottom: 15px;
+      }
+      .remark-slide-content h1 {
+        font-size: 45px;
       }
       li {
         margin-top: 7px;
       }
       h1 {
-        margin-top: -20px;
+        margin-top: 25px;
       }
       .remark-slide-content {
-        font-size: 24px;
+        font-size: 28px;
         padding: 0em 2em 0em 2em;
       }
+      .inverse {
+        background: #272822;
+        color: #777872;
+        text-shadow: 0 0 20px #333;
+      }
+      .inverse h1, .inverse h2 {
+        color: #f3f3f3;
+        line-height: 0.8em;
+      }
+      /* Slide-specific styling */
+      #slide-inverse .footnote {
+        bottom: 12px;
+        left: 20px;
+      }
+
       .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
-      img[alt=HealthPartners] { width: 100px; height: 100px }
+      img[alt=HealthPartners] { width: 100px; height: 75px }
+      img[alt=HealthPartnersBig] { width: 200px; height: 150px }
+      img[alt=OpenshiftAnsible] { width: 550px; height: 400px; }
+      img[alt=OpenshiftCluster] { width: 300px; height: 500px; }
+      img[alt=OpenshiftCluster311] { width: 300px; height: 500px; margin-left: 100px }
       .left-column {
         width: 50%;
         height: 92%;
@@ -41,9 +64,35 @@
         position: absolute;
         left: 20px;
       }
+      .brand-image {
+        display: flex;
+        justify-content: right;
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+      }
+      .namedcode pre {
+        margin-top: 0;
+      }
+      .namedcode h5 {
+        margin-bottom: 0;
+      }
+
+      .brand-image-top {
+        display: flex;
+        justify-content: center;
+        position: absolute;
+        top: 50px;
+        left: 0;
+        right: 0;
+      }
 
       #continuous-delivery-on-openshift {
         padding-top: 1em;
+      }
+
+      .remark-slide-number {
+        display: none;
       }
 
     </style>
