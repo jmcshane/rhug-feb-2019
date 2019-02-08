@@ -111,6 +111,8 @@ name: top-bar
 
 # Referencing `openshift-ansible`
 
+* Wrap openshift-ansible plays in playbooks with pre/post validations
+
 ```
 - name: Scale up new nodes
   import_playbook: openshift-ansible/playbooks/openshift-node/scaleup.yml
@@ -131,6 +133,33 @@ find . -path './openshift-ansible/playbooks/*' -type d -depth 5 |
 
 find . -path './openshift-ansible/playbooks/*' -type d -depth 6 |
   xargs -L1 ln -s ../../../../../../group_vars $1/group_vars
+```
+
+---
+
+# Externalizing Roles
+
+* OpenShift => RHEL 7 system administration
+  * Satellite registration
+  * RHEL 7 CIS standard
+  * DNS management with InfoBlox
+  * Prometheus node exporter
+* Centralize these ansible roles using ansible-galaxy
+
+```
+- name: prometheus_node_exporter
+  src: https://gitlab.healthpartners.com/ansible-roles/prometheus_node_exporter.git
+  scm: git
+```
+
+```
+# Load External Roles
+- hosts: localhost
+  tags: always
+  tasks:
+    - name: Import Roles
+      command: ansible-galaxy install --ignore-certs --force -r requirements.yml
+...
 ```
 
 ---
@@ -166,24 +195,61 @@ find . -path './openshift-ansible/playbooks/*' -type d -depth 6 |
 
 # Orchestration and Automation
 
-- running ansible through tower
-- orchestrate tower jobs through jenkins
+* All ansible jobs are run through Ansible Tower
+* Ansible tower jobs send their job logs to splunk
+* Orchestrate the execution of Ansible Tower jobs through Jenkins
 
 ---
 
 # Tower Configuration 
 
-- define each cluster as an inventory
-- ssh key rotate puts cluster level public key in `authorized_keys`, private key in tower credential
-- "Environment" ties a inventory + credential to configure access to the cluster
+* Define each cluster as an inventory in tower
+  * Use inventory sync in tower to manage this from source code
+* Each cluster has an associated SSH private key
+* SSHKeyRotate (an infra role) puts cluster level public key in `authorized_keys`
+  * Sends private key through tower API
+* An environment ties a inventory & credential together to configure access to the cluster
 
+---
+
+# Tower Configuration
+
+```
+app_only:
+  hosts:
+    rs-dev1-node-abc123.healthpartners.com:
+  vars:
+    openshift_node_group_name: 'node-config-compute'
+dev1:
+  children:
+    OSEv3:
+      vars:
+      children:
+        masters:
+        etcd:
+          children:
+            masters:
+            new_masters:
+        nodes:
+          children:
+            app_only:
+            infra_only:
+            masters:
+        new_nodes:
+        new_masters:
+        remove_nodes:
+nodes_only:
+  children:
+    app_only:
+    infra_only:
+```
 ---
 
 # Jenkins Setup
 
 - Automating change control with standard changes
-  - see my previous talk here
-- A tower job has a limited number of components, we just build jobs that simplify the selection of these:
+  - See my previous talk, linked at the end
+- A tower job has a limited number of components, our jobs simplify the selection of these values:
   - extra vars
   - code location
   - playbook to run
@@ -192,17 +258,152 @@ find . -path './openshift-ansible/playbooks/*' -type d -depth 6 |
 
 ---
 
+# Jenkins Setup
+
+![OpenshiftSoftware](/rhug-feb-2019/images/openshift-software-plays.png)
+![OpenshiftRoles](/rhug-feb-2019/images/openshift-roles.png)
+
+---
+
+# Jenkins Code
+
+```
+environments: [
+  "uat1": [
+    "credentialId": "21",
+    "inventoryId": "10",
+    "type": 'non-prod'
+  ],
+  "prd1": [
+    "credentialId": "22",
+    "inventoryId": "19",
+    "type": 'prod'
+  ],
+  ...
+]
+```
+
+---
+
+# Jenkins Code
+
+```
+messageJson.putAll([
+  name                : 
+    ("${projectConfig.repo}-${projectConfig.branch}"+
+    "-${projectConfig.job}-${env.BUILD_NUMBER}").toString(),
+  scm_type            : 'git',
+  scm_url             : 
+    "${repoUrl}:${projectConfig.group}/${projectConfig.repo}.git".toString(),
+  scm_branch          : projectConfig.branch,
+  credential          : projectConfig.credential,
+  organization        : projectConfig.organization
+])
+
+def project = towerCall([
+    body: messageJson.toString(), 
+    apiPath: 'projects/', 
+    method: 'POST'
+  ])
+```
+---
+
+# Jenkins Code
+
+towerCall.groovy
+```
+def call(config) {
+  def request = [
+          url: "https://rs-tower.healthpartners.com/api/v2/${config.apiPath}",
+          httpMode: config.method,
+          authentication: 'd02124a8-d133-4bbf-a41f-16f310b25232',
+          customHeaders: [[name: 'Content-Type', value: 'application/json']],
+          consoleLogResponseBody: true
+  ] as LinkedHashMap
+  if (config.body) {
+      request << [requestBody: config.body]
+  }
+  if(config.validResponseCodes) {
+      request << [validResponseCodes: config.validResponseCodes]
+  }
+  def httpResponse = httpRequest request
+  if(httpResponse.status != 204) {
+      return new groovy.json.JsonSlurper().parseText(httpResponse.content)
+  }
+}
+```
+
+---
+
 # Patching
 
 - Dont change in flight
 - Scale up, then scale down
-- Except for master nodes :(....working on it
+  - Except for master nodes, but working on it
+- Scaling becomes the same as patching, which is great!
 
 ---
 
 # Scaling
 
-- Same as patching, which is great!
+```
+tasks:
+- name: Set up the new VMs for the cluster
+  import_tasks: plays/ovirt/create-host.yml
+  when:  infrastructure_type == "rhev"
+
+- name: Set up the new VMs in vmware for the dmz cluster
+  import_tasks: plays/vmware/vmware-create-host.yml
+  when: infrastructure_type == "vmware"
+```
+
+---
+
+# Moving from RHEV to VMWare
+
+* Built out a whole new RHEV environment that our team owns
+* Need to make good ownership decisions, use existing services
+* Began to migrate to existing VMWare infrastructure in an isolated DMZ for internet facing web traffic
+
+---
+
+# New Challenges
+
+* Our internet facing DMZ does not have DHCP
+* Assigned an infoblox range that we can assign static IP addresses
+
+
+```
+- name: Add new host to DNS in range
+  infoblox:
+    server: "{ { server.prod } }"
+    username: "{ { infoblox_username }}"
+    password: "{ { infoblox_password }}"
+    action: add_host
+    host: "{ { new_name }}"
+    start_addr: "{ { start_addr }}"
+    end_addr: "{ { end_addr }}"
+  delegate_to: localhost
+```
+
+```
+vmware_guest:
+  networks:
+    ip: "{ { lookup('dig', inventory_hostname) }}"
+```
+---
+
+# Executing a Change
+
+* Commit ansible changes to a branch
+* Execute role against an engineering cluster from branch
+* Create pull request linked to successful job
+* Merge pull request
+* Run all lower environment clusters from master or version specific branch
+* Validate functionality
+* Run all production clusters
+  * Change request automatically tied to Jenkins job log
+
 ---
 
 # Takeaways
